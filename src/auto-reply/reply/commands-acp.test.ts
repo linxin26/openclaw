@@ -245,9 +245,10 @@ function createSessionBindingCapabilities() {
 type AcpBindInput = {
   targetSessionKey: string;
   conversation: {
-    channel?: "discord" | "telegram" | "feishu";
+    channel?: "discord" | "matrix-js" | "telegram" | "feishu";
     accountId: string;
     conversationId: string;
+    parentConversationId?: string;
   };
   placement: "current" | "child";
   metadata?: Record<string, unknown>;
@@ -272,11 +273,18 @@ function createAcpThreadBinding(input: AcpBindInput): FakeBinding {
             accountId: input.conversation.accountId,
             conversationId: nextConversationId,
           }
-        : {
-            channel: "telegram" as const,
-            accountId: input.conversation.accountId,
-            conversationId: nextConversationId,
-          };
+        : channel === "matrix-js"
+          ? {
+              channel: "matrix-js",
+              accountId: input.conversation.accountId,
+              conversationId: nextConversationId,
+              parentConversationId: input.conversation.parentConversationId ?? "!room:example",
+            }
+          : {
+              channel: "telegram" as const,
+              accountId: input.conversation.accountId,
+              conversationId: nextConversationId,
+            };
   return createSessionBinding({
     targetSessionKey: input.targetSessionKey,
     conversation,
@@ -343,6 +351,24 @@ function createTelegramDmParams(commandBody: string, cfg: OpenClawConfig = baseC
   return params;
 }
 
+function createMatrixRoomParams(commandBody: string, cfg: OpenClawConfig = baseCfg) {
+  const params = buildCommandTestParams(commandBody, cfg, {
+    Provider: "matrix-js",
+    Surface: "matrix-js",
+    OriginatingChannel: "matrix-js",
+    OriginatingTo: "room:!room:example",
+    AccountId: "default",
+  });
+  params.command.senderId = "user-1";
+  return params;
+}
+
+function createMatrixThreadParams(commandBody: string, cfg: OpenClawConfig = baseCfg) {
+  const params = createMatrixRoomParams(commandBody, cfg);
+  params.ctx.MessageThreadId = "$thread-42";
+  return params;
+}
+
 async function runDiscordAcpCommand(commandBody: string, cfg: OpenClawConfig = baseCfg) {
   return handleAcpCommand(createDiscordParams(commandBody, cfg), true);
 }
@@ -374,6 +400,14 @@ function createFeishuDmParams(commandBody: string, cfg: OpenClawConfig = baseCfg
 
 async function runFeishuDmAcpCommand(commandBody: string, cfg: OpenClawConfig = baseCfg) {
   return handleAcpCommand(createFeishuDmParams(commandBody, cfg), true);
+}
+
+async function runMatrixRoomAcpCommand(commandBody: string, cfg: OpenClawConfig = baseCfg) {
+  return handleAcpCommand(createMatrixRoomParams(commandBody, cfg), true);
+}
+
+async function runMatrixThreadAcpCommand(commandBody: string, cfg: OpenClawConfig = baseCfg) {
+  return handleAcpCommand(createMatrixThreadParams(commandBody, cfg), true);
 }
 
 async function runInternalAcpCommand(params: {
@@ -563,7 +597,18 @@ describe("/acp command", () => {
   });
 
   it("binds Telegram topic ACP spawns to full conversation ids", async () => {
-    const result = await runTelegramAcpCommand("/acp spawn codex --thread here");
+    const cfg = {
+      ...baseCfg,
+      channels: {
+        ...baseCfg.channels,
+        telegram: {
+          threadBindings: {
+            spawnAcpSessions: true,
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+    const result = await runTelegramAcpCommand("/acp spawn codex --thread here", cfg);
 
     expect(result?.reply?.text).toContain("Spawned ACP session agent:codex:acp:");
     expect(result?.reply?.text).toContain("Bound this conversation to");
@@ -581,7 +626,18 @@ describe("/acp command", () => {
   });
 
   it("binds Telegram DM ACP spawns to the DM conversation id", async () => {
-    const result = await runTelegramDmAcpCommand("/acp spawn codex --thread here");
+    const cfg = {
+      ...baseCfg,
+      channels: {
+        ...baseCfg.channels,
+        telegram: {
+          threadBindings: {
+            spawnAcpSessions: true,
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+    const result = await runTelegramDmAcpCommand("/acp spawn codex --thread here", cfg);
 
     expect(result?.reply?.text).toContain("Spawned ACP session agent:codex:acp:");
     expect(result?.reply?.text).toContain("Bound this conversation to");
@@ -651,6 +707,47 @@ describe("/acp command", () => {
     );
     expect(hoisted.callGatewayMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: "sessions.patch" }),
+    );
+  });
+
+  it("rejects Matrix thread-bound ACP spawn when spawnAcpSessions is not enabled", async () => {
+    const result = await runMatrixRoomAcpCommand("/acp spawn codex --thread auto");
+
+    expect(result?.reply?.text).toContain(
+      "channels.matrix-js.threadBindings.spawnAcpSessions=true",
+    );
+    expect(hoisted.closeMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.sessionBindingBindMock).not.toHaveBeenCalled();
+  });
+
+  it("binds Matrix thread-bound ACP spawns when enabled explicitly", async () => {
+    const cfg = {
+      ...baseCfg,
+      channels: {
+        ...baseCfg.channels,
+        "matrix-js": {
+          threadBindings: {
+            enabled: true,
+            spawnAcpSessions: true,
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const result = await runMatrixThreadAcpCommand("/acp spawn codex --thread here", cfg);
+
+    expect(result?.reply?.text).toContain("Spawned ACP session agent:codex:acp:");
+    expect(result?.reply?.text).toContain("Bound this thread to");
+    expect(hoisted.sessionBindingBindMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        placement: "current",
+        conversation: expect.objectContaining({
+          channel: "matrix-js",
+          accountId: "default",
+          conversationId: "$thread-42",
+          parentConversationId: "!room:example",
+        }),
+      }),
     );
   });
 
