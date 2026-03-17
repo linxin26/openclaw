@@ -105,6 +105,7 @@ export {
   resolveMatrixCredentialsPath,
   resolveMatrixLegacyFlatStoragePaths,
 } from "../infra/matrix-storage-paths.js";
+export { getMatrixScopedEnvVarNames } from "../infra/matrix-env-vars.js";
 export {
   requiresExplicitMatrixDefaultAccount,
   resolveMatrixDefaultOrOnlyAccountId,
@@ -147,6 +148,4 @@ export {
   buildProbeChannelStatusSummary,
   collectStatusIssuesFromLastError,
 } from "./status-helpers.js";
-export { matrixSetupWizard } from "../../extensions/matrix/api.js";
-export { matrixSetupAdapter } from "../../extensions/matrix/api.js";
 export type { GatewayRequestHandlerOptions } from "../gateway/server-methods/types.js";

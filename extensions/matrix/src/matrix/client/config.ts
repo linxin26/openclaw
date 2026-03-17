@@ -1,5 +1,6 @@
 import {
   DEFAULT_ACCOUNT_ID,
+  getMatrixScopedEnvVarNames,
   isPrivateOrLoopbackHost,
   normalizeAccountId,
   normalizeOptionalAccountId,
@@ -7,7 +8,6 @@ import {
   requiresExplicitMatrixDefaultAccount,
   resolveMatrixDefaultOrOnlyAccountId,
 } from "openclaw/plugin-sdk/matrix";
-import { getMatrixScopedEnvVarNames } from "../../../../../src/infra/matrix-env-vars.js";
 import { getMatrixRuntime } from "../../runtime.js";
 import type { CoreConfig } from "../../types.js";
 import {
@@ -92,7 +92,7 @@ function resolveGlobalMatrixEnvConfig(env: NodeJS.ProcessEnv): MatrixEnvConfig {
   };
 }
 
-export { getMatrixScopedEnvVarNames } from "../../../../../src/infra/matrix-env-vars.js";
+export { getMatrixScopedEnvVarNames } from "openclaw/plugin-sdk/matrix";
 
 export function resolveScopedMatrixEnvConfig(
   accountId: string,

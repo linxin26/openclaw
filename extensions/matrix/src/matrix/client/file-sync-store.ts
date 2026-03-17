@@ -7,7 +7,7 @@ import {
   type ISyncResponse,
   type IStoredClientOpts,
 } from "matrix-js-sdk";
-import { createAsyncLock, writeJsonAtomic } from "../../../../../src/infra/json-files.js";
+import { writeJsonFileAtomically } from "openclaw/plugin-sdk/matrix";
 import { LogService } from "../sdk/logger.js";
 
 const STORE_VERSION = 1;
@@ -18,6 +18,23 @@ type PersistedMatrixSyncStore = {
   savedSync: ISyncData | null;
   clientOptions?: IStoredClientOpts;
 };
+
+function createAsyncLock() {
+  let lock: Promise<void> = Promise.resolve();
+  return async function withLock<T>(fn: () => Promise<T>): Promise<T> {
+    const previous = lock;
+    let release: (() => void) | undefined;
+    lock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release?.();
+    }
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -229,11 +246,7 @@ export class FileBackedMatrixSyncStore extends MemoryStore {
     };
     try {
       await this.persistLock(async () => {
-        await writeJsonAtomic(this.storagePath, payload, {
-          mode: 0o600,
-          trailingNewline: true,
-          ensureDirMode: 0o700,
-        });
+        await writeJsonFileAtomically(this.storagePath, payload);
       });
     } catch (err) {
       this.dirty = true;
