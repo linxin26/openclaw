@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openclaw-android-debug
-          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
       
       # 9. 上传 Release APK 产物
@@ -88,7 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openclaw-android-release
-          path: apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: apps/android/app/build/outputs/apk/release/*.apk
           retention-days: 30
       
       # 10. 显示构建信息
