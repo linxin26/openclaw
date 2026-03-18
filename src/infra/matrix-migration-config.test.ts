@@ -181,6 +181,66 @@ describe("resolveMatrixMigrationAccountTarget", () => {
     });
   });
 
+  it("does not inherit the base access token for non-default accounts", async () => {
+    await withTempHome(async () => {
+      const cfg: OpenClawConfig = {
+        channels: {
+          matrix: {
+            homeserver: "https://matrix.example.org",
+            userId: "@base-bot:example.org",
+            accessToken: "tok-base",
+            accounts: {
+              ops: {
+                homeserver: "https://matrix.example.org",
+                userId: "@ops-bot:example.org",
+              },
+            },
+          },
+        },
+      };
+
+      const target = resolveMatrixMigrationAccountTarget({
+        cfg,
+        env: process.env,
+        accountId: "ops",
+      });
+
+      expect(target).toBeNull();
+    });
+  });
+
+  it("does not inherit the global Matrix access token for non-default accounts", async () => {
+    await withTempHome(
+      async () => {
+        const cfg: OpenClawConfig = {
+          channels: {
+            matrix: {
+              accounts: {
+                ops: {
+                  homeserver: "https://matrix.example.org",
+                  userId: "@ops-bot:example.org",
+                },
+              },
+            },
+          },
+        };
+
+        const target = resolveMatrixMigrationAccountTarget({
+          cfg,
+          env: process.env,
+          accountId: "ops",
+        });
+
+        expect(target).toBeNull();
+      },
+      {
+        env: {
+          MATRIX_ACCESS_TOKEN: "tok-global",
+        },
+      },
+    );
+  });
+
   it("uses the same scoped env token encoding as runtime account auth", async () => {
     await withTempHome(async () => {
       const cfg: OpenClawConfig = {

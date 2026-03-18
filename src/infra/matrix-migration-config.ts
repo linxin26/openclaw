@@ -77,6 +77,20 @@ function resolveMatrixAccountConfigEntry(
   return findMatrixAccountEntry(cfg, accountId);
 }
 
+function resolveMatrixMigrationAccountAuthField(params: {
+  accountValue: unknown;
+  scopedEnvValue: string;
+  channelValue: unknown;
+  globalEnvValue: string;
+  isDefaultAccount: boolean;
+}): string {
+  return (
+    clean(params.accountValue) ||
+    params.scopedEnvValue ||
+    (params.isDefaultAccount ? clean(params.channelValue) || params.globalEnvValue : "")
+  );
+}
+
 function resolveMatrixFlatStoreSelectionNote(
   cfg: OpenClawConfig,
   accountId: string,
@@ -104,10 +118,14 @@ export function resolveMatrixMigrationConfigFields(params: {
   const scopedEnv = resolveScopedMatrixEnvConfig(params.accountId, params.env);
   const globalEnv = resolveGlobalMatrixEnvConfig(params.env);
   const normalizedAccountId = normalizeAccountId(params.accountId);
-  const userId =
-    clean(account?.userId) ||
-    scopedEnv.userId ||
-    (normalizedAccountId === DEFAULT_ACCOUNT_ID ? clean(channel?.userId) || globalEnv.userId : "");
+  const isDefaultAccount = normalizedAccountId === DEFAULT_ACCOUNT_ID;
+  const userId = resolveMatrixMigrationAccountAuthField({
+    accountValue: account?.userId,
+    scopedEnvValue: scopedEnv.userId,
+    channelValue: channel?.userId,
+    globalEnvValue: globalEnv.userId,
+    isDefaultAccount,
+  });
 
   return {
     homeserver:
@@ -116,11 +134,13 @@ export function resolveMatrixMigrationConfigFields(params: {
       clean(channel?.homeserver) ||
       globalEnv.homeserver,
     userId,
-    accessToken:
-      clean(account?.accessToken) ||
-      scopedEnv.accessToken ||
-      clean(channel?.accessToken) ||
-      globalEnv.accessToken,
+    accessToken: resolveMatrixMigrationAccountAuthField({
+      accountValue: account?.accessToken,
+      scopedEnvValue: scopedEnv.accessToken,
+      channelValue: channel?.accessToken,
+      globalEnvValue: globalEnv.accessToken,
+      isDefaultAccount,
+    }),
   };
 }
 
